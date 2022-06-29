@@ -130,9 +130,7 @@ makeGuess = do
       if inWord then do
         -- The letter IS in the word
         if wordFound newguess (secret game) then do
-          liftIO (setSGR [SetColor Foreground Vivid Green])
-          liftIO (putStrLn $ "Congratulations, you guessed the word '" ++ secret game ++ "'!")
-          liftIO (setSGR [Reset])
+          showGameWin
         else do
           drawHangman
           makeGuess
@@ -143,21 +141,33 @@ makeGuess = do
         drawHangman
         if iRemaining == 0 then
           do
-            liftIO (setSGR [SetColor Foreground Vivid Red])
-            liftIO (putStrLn "GAME OVER!")
-            liftIO (putStrLn ("The word was: " ++ show (secret game)))
-            liftIO (setSGR [Reset])
+            showGameOver
             else
               do
                 liftIO (putStrLn $ "Guesses remaining: " ++ show iRemaining)
                 makeGuess
 
+showGameWin :: StateT GameState IO ()
+showGameWin = do
+  game <- get
+  liftIO (setSGR [SetColor Foreground Vivid Green])
+  liftIO (putStrLn $ "Congratulations, you guessed the word '" ++ secret game ++ "'!")
+  liftIO (setSGR [Reset])
+
+showGameOver :: StateT GameState IO ()
+showGameOver = do
+  game <- get
+  liftIO (setSGR [SetColor Foreground Vivid Red])
+  liftIO (putStrLn "GAME OVER!")
+  liftIO (putStrLn ("The word was: " ++ show (secret game)))
+  liftIO (setSGR [Reset])
+
 getInputValidation :: String -> GuessedLetters -> String
-getInputValidation l guessed = do
-  if length (filter C.isLetter l) /= 1 then
+getInputValidation a guessed = do
+  if length (filter C.isLetter a) /= 1 then
     "Please enter only 1 letter."
   else do
-     if head l `elem` guessed then
+     if head a `elem` guessed then
        "You have already guessed this letter."
       else
          ""
@@ -170,15 +180,15 @@ showMaskedWord = do
   liftIO (putStrLn "\n")
   liftIO (setSGR [SetColor Foreground Vivid Blue])
   -- Get the masked word and add spaces
-  let sMasked = intersperse ' ' (getMaskedWord currentSecret currentGuessed)
+  let sMasked = intersperse ' ' (getMaskedWord currentGuessed currentSecret)
   liftIO (putStrLn sMasked)
   liftIO (putStrLn $ show (length currentSecret) ++ " letter word")
   liftIO (setSGR [Reset])
   liftIO (putStrLn " ")
 
-getMaskedWord :: SecretWord -> GuessedLetters -> String
-getMaskedWord xs guessed =
-  [if x `elem` guessed then x else '_' | x <- xs]
+getMaskedWord :: GuessedLetters -> SecretWord -> String
+getMaskedWord guessed secret =
+  [if x `elem` guessed then x else '_' | x <- secret]
 
 wordFound :: GuessedLetters -> SecretWord -> Bool
 wordFound guess secret = all (`elem` guess) secret
