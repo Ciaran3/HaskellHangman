@@ -115,8 +115,6 @@ makeGuess = do
   c <- C.toUpper <$> liftIO getChar
   liftIO (hSetEcho stdin True)
 
-  --liftIO (putStrLn "Guessed: " ++ show c:[])
-
   if c == '?' then
     return ()
   else do
@@ -126,16 +124,19 @@ makeGuess = do
     -- Check if the guess is valid
     let validationMessage = getInputValidation c (guessed game)
 
+    liftIO clearScreen
+
     if validationMessage /= "" then do
+      -- Do not increment the incorrect guess count, just ask again for input
+      showMaskedWord
+      drawHangman
       liftIO (hFlush stdout)
       liftIO (putStrLn validationMessage)
-      -- Do not increment the incorrect guess count, just ask again for input
       makeGuess
     else do
       let newguess = c:[] ++ guessed game
       put $ game { guessed = newguess}
 
-      -- Show the current progess of the guesses
       showMaskedWord
 
       let inWord = c `elem` secret game
