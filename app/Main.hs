@@ -8,6 +8,7 @@ import qualified Data.Char as C
 import Data.List
 import System.Directory
 import Control.Monad.State
+import Data.Char (Char)
 
 -- Fixed number of how many guesses in total
 totalGuesses = 8
@@ -34,7 +35,7 @@ main = do
 showIntroScreen :: IO ()
 showIntroScreen = do
   clearScreen
-  setSGR [SetColor Foreground Vivid Red]
+  setSGR [SetColor Foreground Vivid Green]
   putStrLn "-------------------"
   putStrLn "Welcome to Hangman!"
   putStrLn "-------------------"
@@ -42,19 +43,25 @@ showIntroScreen = do
 
 promptForGameType :: IO ()
 promptForGameType = do
-    putStrLn "Do you want to Enter a word or select a Random one?"
-    putStrLn "Press: E, R or Q to quit."
+    putStrLn "1. Enter a word."
+    putStrLn "2. Select a random word."
+    putStrLn "3. Quit."
+    putStrLn "Press 1, 2 or 3."
     hFlush stdout
-    a <- map C.toUpper <$> getLine
+    hSetBuffering stdin NoBuffering 
+    hSetEcho stdin False
+    a <- C.toUpper <$> getChar
+    hSetEcho stdin True
+    hSetBuffering stdin LineBuffering 
     case a of
-        "Q"  -> return ()
-        "E"  -> promptForUserWord
-        "R"  -> loadRandomWord
+        '1'  -> promptForUserWord
+        '2'  -> loadRandomWord
+        '3'  -> return ()
         _    -> promptForGameType
 
 promptForUserWord :: IO ()
 promptForUserWord = do
-  putStrLn "Please a word at least 3 letters long then press Enter (input is hidden). "
+  putStrLn "Enter a word at least 3 letters long then press Enter (input is hidden)."
   hFlush stdout
   -- Turn off echo
   hSetEcho stdin False
@@ -95,6 +102,7 @@ getInitialState s = do
 
 startGame :: StateT GameState IO ()
 startGame = do
+  liftIO (hSetBuffering stdin NoBuffering)
   showMaskedWord
   makeGuess
 
@@ -103,48 +111,52 @@ makeGuess = do
   progress <- get
   liftIO (putStrLn "Guess a letter or '?' to quit:")
   liftIO (hFlush stdout)
-  c <- liftIO getLine
-  let guessUpper = map C.toUpper c
+  liftIO (hSetEcho stdin False)
+  c <- C.toUpper <$> liftIO getChar
+  liftIO (hSetEcho stdin True)
 
-  if guessUpper == "?" then
+  --liftIO (putStrLn "Guessed: " ++ show c:[])
+
+  if c == '?' then
     return ()
   else do
     game <- get
     let guessesremaining = totalGuesses - incorrectGuesses game
 
     -- Check if the guess is valid
-    let validationMessage = getInputValidation guessUpper (guessed game)
+    let validationMessage = getInputValidation c (guessed game)
 
     if validationMessage /= "" then do
+      liftIO (hFlush stdout)
       liftIO (putStrLn validationMessage)
-      -- Do not increment the incorrect guess count - ask again for input
+      -- Do not increment the incorrect guess count, just ask again for input
       makeGuess
     else do
-      let newguess = guessUpper ++ guessed game
+      let newguess = c:[] ++ guessed game
       put $ game { guessed = newguess}
 
       -- Show the current progess of the guesses
       showMaskedWord
 
-      let inWord = head guessUpper `elem` secret game
+      let inWord = c `elem` secret game
       if inWord then do
-        -- The letter IS in the word
+        -- The letter is in the word
         if wordFound newguess (secret game) then do
           showGameWin
         else do
           drawHangman
           makeGuess
       else do
-        --The letter is NOT in the word
+        --The letter is not in the word
         let iRemaining = guessesremaining - 1
-        put $ game { incorrectGuesses = incorrectGuesses game + 1}
+        put $ game { incorrectGuesses = incorrectGuesses game + 1, guessed = newguess}
         drawHangman
         if iRemaining == 0 then
           do
             showGameOver
             else
               do
-                liftIO (putStrLn $ "Guesses remaining: " ++ show iRemaining)
+                liftIO (putStrLn $ "The letter " ++ show c ++ " is not in the word. " ++ show iRemaining ++ " guesses remaining.")
                 makeGuess
 
 showGameWin :: StateT GameState IO ()
@@ -162,13 +174,13 @@ showGameOver = do
   liftIO (putStrLn ("The word was: " ++ show (secret game)))
   liftIO (setSGR [Reset])
 
-getInputValidation :: String -> GuessedLetters -> String
+getInputValidation :: Char -> GuessedLetters -> String
 getInputValidation a guessed = do
-  if length (filter C.isLetter a) /= 1 then
-    "Please enter only 1 letter."
+  if not (C.isLetter a) then
+    "Please enter a letter."
   else do
-     if head a `elem` guessed then
-       "You have already guessed this letter."
+     if a `elem` guessed then
+       "You have already guessed the letter " ++ show a
       else
          ""
 
