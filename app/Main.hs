@@ -157,8 +157,12 @@ makeGuess = do
             showGameOver
             else
               do
-                liftIO (putStrLn $ "The letter " ++ show c ++ " is not in the word. " ++ show iRemaining ++ " guesses remaining.")
+                liftIO (putStrLn $ "The letter " ++ show c ++ " is not in the word. " ++ getGuessRemainingText iRemaining)
                 makeGuess
+
+getGuessRemainingText :: Int -> String
+getGuessRemainingText 1 = "1 guess remaining."
+getGuessRemainingText x = show x ++ " guesses remaining."
 
 showGameWin :: StateT GameState IO ()
 showGameWin = do
